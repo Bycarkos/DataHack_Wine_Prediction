@@ -61,8 +61,8 @@ class BaseModel(ABC):
             train_targets = df.iloc[train_index][target_cols].values
             test_targets = df.iloc[test_index][target_cols].values
 
-            train_mask = pd.DataFrame(train_targets).isin(targets).all(axis=1).values
-            test_mask = pd.DataFrame(test_targets).isin(targets).all(axis=1).values
+            train_mask = pd.DataFrame(train_targets).isin(targets.flatten()).all(axis=1).values
+            test_mask = pd.DataFrame(test_targets).isin(targets.flatten()).all(axis=1).values
 
             result.append((train_index[train_mask], test_index[test_mask]))
 

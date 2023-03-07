@@ -1,59 +1,8 @@
-Coses
+Primer Entrenament fet amb crossvalidació segons Campaña només
 
-
-Shape:
-
-Amb el join fet 
-
-((68866, 45), (68866,)) --> TRAIN
-
-((9814, 45), (9814,)) --> TEST
+resultats:
 
 
 
-Fent una primera exploració de la regressió lineal amb el 2021 entre les dades que tenen més correlació surt això: (* semblen més importants)
 
-[('precip1Hour', -2.8779504330556094e-05, 'lose precip1Hour'),
- ('snow3Day', -2.0864610211557277e-05, 'lose snow2Day'),
- ('temperatureFeelsLike', 0.0010773450963691422, 'lose temperature'),
- ('ID_ZONA', 0.0041460349189286205, 'lose ID_ESTACION'),
- ('ID_ESTACION', -6.263131300543456e-05, 'lose ID_ESTACION_train'),
- ('snow2Day', -2.2035554688493164e-05, 'lose snow24Hour'),
- ('snow3Day', -2.0864610211557277e-05, 'lose snow24Hour'),
- ('precip3Day', -1.0347280501310507e-05, 'lose precip2Day'),
- ('snow3Day', -2.0864610211557277e-05, 'lose snow7Day'),
- ('snow7Day', -2.1595243673511177e-05, 'lose snow2Day'),
- ('windSpeed', 9.527136916642753e-05, 'lose windGust'),
- ('ID_ZONA', 0.0041460349189286205, 'lose ID_ESTACION_train'),
- ('precipYtd', 8.137255169604618e-05, 'lose month'),
- ('precip24Hour', -1.0936298537655986e-05, 'lose precip2Day'),
- ('temperature', 0.0009253992479907325, 'lose temperatureMax24Hour'), *
- ('temperatureFeelsLike', 0.0010773450963691422, 'lose temperatureMax24Hour'),*
- ('snow7Day', -2.1595243673511177e-05, 'lose snow24Hour'),
- ('snow1Hour', -2.9083894386605635e-05, 'lose snow6Hour'),
- ('temperatureMin24Hour', 0.0005513427830301509, 'lose temperatureMax24Hour'),
- ('temperatureFeelsLike', 0.0010773450963691422, 'lose temperatureMin24Hour'),
- ('temperature', 0.0009253992479907325, 'lose temperatureMin24Hour'),
- ('precip6Hour', -2.6226342411117542e-05, 'lose precip1Hour'),
- ('precip3Day', -1.0347280501310507e-05, 'lose precip24Hour'),
- ('precip7Day', 1.941556700513214e-05, 'lose precip3Day'),
- ('precipMtd', 0.00021053262085002356, 'lose precip7Day'),
- ('precip24Hour', -1.0936298537655986e-05, 'lose precip6Hour'),
- ('VARIEDAD', 0.2394645283005823, 'lose COLOR'), **
- ('snowYtd', 0.0023233897392125336, 'lose snowSeason'), **
- ('precip7Day', 1.941556700513214e-05, 'lose precip2Day')]
- 
- Coses a tenir en compte:
- 
- Anàlisis pendents:
- 
- Quina varietat de raïm es cultiva a segons quina finca, donat que hi ha finques on hi ha més hectaries --> No, totes tenen ses mateixes hecatarie
- 
- Per tant es cultiven diferents varietats de raïm en el mateix espai? --> Si (Per tant te la jugues)
- 
- Coses Extranyes:
-     Hi ha finques que utilitzen diferents estacions meteorològiques per a diferents varietats (molt extrany)
- 
- 
-plot_cuita_per_anys -- src/plots/Cuita_per_anys.png
- 
+#TODO S'ha de calcular la superficie també
