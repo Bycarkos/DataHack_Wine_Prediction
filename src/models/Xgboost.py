@@ -1,66 +1,48 @@
-import numpy as np 
-import pandas as pd 
+from pathlib import Path
+
+import pandas as pd
+from overrides import overrides
+
 from .BaseModel import *
 import xgboost as xgb
 from typing import *
-from utils import write_compare
+
+from src.utils import write_compare_file
+
 
 class XGboost(BaseModel):
     
-    def __init__(self, cfg:dict):
+    def __init__(self, cfg: dict, export_dir: Path):
         super().__init__()
-        
+
         # TODO DOCUMENTAR
+        self.cfg = cfg
+
         self._dict_results = []
         self._validations_results = []
         self._test_results = []
-    
+
+        self.export_dir = export_dir
     
     def reset_params(self):
         self._dict_results = []
         self._validations_results = []
         self._test_results = []
         
-    def custom_kfold_partition(self, df: pd.DataFrame, target_cols: list, n_splits: int = 5, shuffle: bool = True, random_state: Optional[Any] = None):
+    def custom_kfold_partition(self, df: pd.DataFrame, target_cols: Union[str, list], n_splits: int = 5, shuffle: bool = True, random_state: Optional[Any] = None):
         return super().custom_kfold_partition(df, target_cols, n_splits, shuffle, random_state)
-        
-    def initialize_matrix(self,X:np.ndarray,y:np.ndarray):
-        return xgb.DMatrix(X, label=y)
-    
-    
-    def validator(self,model, X_val, y_val:Optional[np.ndarray]=None):
-        """
-        Valida un modelo de regresión XGBoost y devuelve la métrica de validación RMSE.
 
-        Args:
-            model (xgb.XGBRegressor): El modelo de regresión XGBoost entrenado.
-            X_val (pd.DataFrame or np.array): El conjunto de validación de características.
-            y_val (pd.Series or np.array): El conjunto de validación de etiquetas.
+    @staticmethod
+    def initialize_matrix(x: np.ndarray, y: np.ndarray):
+        return xgb.DMatrix(x, label=y)
 
-        Returns:
-            La métrica de validación (RMSE).
-        """
-        y_pred = model.predict(X_val)
-        
-        if not y_val is None:rmse = self._rmse(y_val, y_pred)
-        else:rmse = -1
-        
-
-        result = {
-            'rmse': rmse,
-            'gt': y_val,
-            'pred': y_pred
-            }
-
-        
-        return result, y_pred
-            
-    def trainer(self,X_train:np.ndarray, y_train:np.ndarray, **params):
+    @overrides(check_signature=False)
+    def trainer(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray, model_config: dict):
         """
         Entrena un modelo de regresión XGBoost y devuelve el modelo entrenado, RMSE, número de muestras y número de características.
 
         Args:
-            X_train (pd.DataFrame or np.array): El conjunto de entrenamiento de características.
+            x_train (pd.DataFrame or np.array): El conjunto de entrenamiento de características.
             y_train (pd.Series or np.array): El conjunto de entrenamiento de etiquetas.
             params (dict): Los parámetros del modelo de regresión XGBoost.
 
@@ -69,13 +51,12 @@ class XGboost(BaseModel):
         """
         
         #dtrain = xgb.DMatrix(X_train, label=y_train)
-        num_samples, num_features = X_train.shape
+        num_samples, num_features = x_train.shape
 
-        model = xgb.XGBRegressor(**params)
-        model.fit(X_train, y_train, eval_set=[(X_train, y_train)])
+        model = xgb.XGBRegressor(**model_config)
+        model.fit(x_train, y_train, eval_set=[(x_train, y_train), (x_val, y_val)], early_stopping_rounds=10)  # Evaluation on train set, validation done apart
 
-        y_pred = model.predict(X_train)
-    
+        y_pred = model.predict(x_train)
 
         rmse = self._rmse(y_train, y_pred)
 
@@ -87,17 +68,46 @@ class XGboost(BaseModel):
             }
 
         return result, y_pred, model
-    
-    
-    def train(self, X:np.ndarray, y:np.ndarray, write_compare_name:Optional[str]=None , kfold_indexes:Optional[None]=None, **params):
-        
+
+    @overrides(check_signature=False)
+    def validator(self, model, x_val, y_val: Optional[np.ndarray] = None):
+        """
+        Valida un modelo de regresión XGBoost y devuelve la métrica de validación RMSE.
+
+        Args:
+            model (xgb.XGBRegressor): El modelo de regresión XGBoost entrenado.
+            x_val (pd.DataFrame or np.array): El conjunto de validación de características.
+            y_val (pd.Series or np.array): El conjunto de validación de etiquetas.
+
+        Returns:
+            La métrica de validación (RMSE).
+        """
+        y_pred = model.predict(x_val)
+
+        if y_val is not None:
+            rmse = self._rmse(y_val, y_pred)
+        else:
+            rmse = -1
+
+        result = {
+            'rmse': rmse,
+            'gt': y_val,
+            'pred': y_pred
+        }
+
+        return result, y_pred
+
+    def train(self, x: Union[np.ndarray, pd.DataFrame], y: Union[np.ndarray, pd.DataFrame], model_config: dict,
+              write_compare: bool = False, kfold_indexes: Optional[list] = None):
         """
         Entrena un modelo de regresión XGBoost y devuelve tres listas con la prediccion según la métrica RMSE.
 
         Args:
-            X (pd.DataFrame or np.array): Todo el conjunto de datos
-            y_train (pd.Series or np.array): El conjunto de etiquetas.
-            params (dict): Los parámetros del modelo de regresión XGBoost.
+            x (pd.DataFrame or np.array): El conjunto de datos entero
+            y (pd.Series or np.array): El conjunto de etiquetas.
+            model_config (dict): Los parámetros del modelo de regresión XGBoost.
+            write_compare:
+            kfold_indexes:
 
         Returns:
             Tres listas con los resultados según la métrica para cada tipo de partición 
@@ -107,51 +117,58 @@ class XGboost(BaseModel):
         val_metrics = []
         test_metrics = []
         
-        if kfold_indexes == None:
-            X_train, y_train, X_val, y_val, X_test, y_test = self.train_val_test_split(X, y, random_state="hack")
+        if not kfold_indexes:
+            print("No kfold indexes, creating random split...")
+            x_train, y_train, x_val, y_val, x_test, y_test = self.train_val_test_split(x, y, random_state=1)
 
-            result = self.trainer(X_train=X_train, y_train=y_train, **params)
-            train_r2 = self._r2(prediction=result, target=y_train)
+            print("--> Training")
+            result, y_pred, model = self.trainer(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val, model_config=model_config)
+            train_r2 = self._r2(prediction=y_pred, target=y_train)
             train_metrics.append((result, train_r2))
-            
-            resultat_val = self.validator(X_val=X_val, y_val=y_val) 
-            val_r2 = self._r2(prediction=resultat_val, target=y_val)
+
+            print("--> Validation")
+            resultat_val, y_pred = self.validator(model=model, x_val=x_val, y_val=y_val)
+            val_r2 = self._r2(prediction=y_pred, target=y_val)
             val_metrics.append((resultat_val, val_r2))
-            
-            resultat_test = self.validator(X_val=X_test, y_val=y_test)
-            test_r2 = self._r2(prediction=resultat_test, target=y_test)
+
+            print("--> Test")
+            resultat_test, y_pred = self.validator(model=model, x_val=x_test, y_val=y_test)
+            test_r2 = self._r2(prediction=y_pred, target=y_test)
             test_metrics.append((resultat_test, test_r2))
                             
         else:
-            
-        
+            print("Kfold indexes, iterating over splits...")
             for fold_id, (train_idx, test_idx) in enumerate(kfold_indexes):
+                print("--> Fold_id:", fold_id)
                 
-                # trai part
-                X_train = X.iloc[train_idx]
-
+                # Train split
+                x_train = x.iloc[train_idx]
                 y_train = y.iloc[train_idx]
                 
-                #val part
-                X_val = X.iloc[test_idx]
+                # Valid split
+                x_val = x.iloc[test_idx]
                 y_val = y.iloc[test_idx]
-                
-                result, pred, net = self.trainer(X_train=X_train, y_train=y_train, **params)
-                result["pred"] = pred
+
+                print("--> Training")
+                result, y_pred, model = self.trainer(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val, model_config=model_config)
+                result["pred"] = y_pred
                 result["gt"] = y_train
                 result["fold_indexes"] = train_idx
-                train_r2 = self._r2(prediction=pred, target=y_train)
+                train_r2 = self._r2(prediction=y_pred, target=y_train)
                 train_metrics.append((result, train_r2))
 
-                resultat_val, y_pred = self.validator(model=net,X_val=X_val, y_val=y_val) 
+                print("--> Validation")
+                resultat_val, y_pred = self.validator(model=model, x_val=x_val, y_val=y_val)
                 resultat_val["fold_indexes"] = test_idx
                 val_r2 = self._r2(prediction=y_pred, target=y_val)
                 val_metrics.append((resultat_val, val_r2))
                 
-                if write_compare_name is not None:
-                    write_compare(X_val,y_pred, y_val, name_file=write_compare_name, fold=str(fold_id))
+                if write_compare:
+                    write_compare_fold_dir = self.export_dir / "kfold"
+                    write_compare_fold_dir.mkdir(exist_ok=True)
+                    write_compare_name = str(write_compare_fold_dir / f"{fold_id}.csv")
+                    write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name, fold=str(fold_id))
                 
         self._dict_results = train_metrics
         self._validations_results = val_metrics
         self._test_results = test_metrics
-            

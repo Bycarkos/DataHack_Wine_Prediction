@@ -1,8 +1,0 @@
-Primer Entrenament fet amb crossvalidació segons Campaña només
-
-resultats:
-
-
-
-
-#TODO S'ha de calcular la superficie també
