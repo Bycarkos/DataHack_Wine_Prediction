@@ -1,0 +1,14 @@
+epochs: 100
+val_compare_file: True
+kfold_agg: True
+
+optimizer:
+  _target_: torch.optim.Adam
+  params: ???
+  lr: 1e-2
+  weight_decay: 5e-8
+
+
+criterion:
+  _target_: torch.nn.MSELoss
+  reduction: "mean"

@@ -2,7 +2,7 @@ import pickle
 from pathlib import Path
 import os
 from typing import *
-
+from sklearn.metrics import mean_squared_error
 import numpy as np
 import pandas as pd
 
@@ -22,16 +22,18 @@ def get_best_model(results:List[Tuple[float, float]]):
     return results.index(min(results, key = lambda t: t[0]["rmse"]))
     
     
-def write_compare_file(x: pd.DataFrame, predictions: Union[list, np.ndarray], gt: Union[list, np.ndarray], name_file: str, fold: str):
+def write_compare_file(x: pd.DataFrame, predictions: Union[list, np.ndarray], gt: Union[list, np.ndarray], name_file: str):
     x.loc[:, "RESPONSE"] = predictions
     x.loc[:, "REAL"] = gt
     
-    to_save = x.loc[:, ["ID_FINCA", "VARIEDAD", "REAL", "RESPONSE"]]
+    to_save = x.groupby(["ID_FINCA", "VARIEDAD", "MODO", "TIPO", "COLOR", "SUPERFICIE"]).sum().reset_index()
 
     print("LA PRODUCCIÓ FINAL VAL= {}".format(to_save["RESPONSE"].sum()))    
     print("LA PRODUCCIÓ FINAL REAL= {}".format(to_save["REAL"].sum()))
+    percent_error = (abs(to_save["RESPONSE"].sum()-to_save["REAL"].sum()))/to_save["REAL"].sum()
     print("LA DIFERÈNCIA = {}".format(to_save["RESPONSE"].sum()-to_save["REAL"].sum()))
-
+    print(f"EL PORCENTAJE DE ERROR ES DE: {percent_error}")
+    print(f"EL RMSE ÉS DE: {mean_squared_error(gt, predictions)**0.5}")
     to_save.to_csv(name_file, sep="|", index=False, header=False)
 
 

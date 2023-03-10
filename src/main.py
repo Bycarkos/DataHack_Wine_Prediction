@@ -6,23 +6,33 @@ import pandas as pd
 from models.Xgboost import XGboost
 import numpy as np
 
-from src.utils import save_pickle, get_best_model, write_response_file
+from utils import save_pickle, get_best_model, write_response_file
+from hydra.utils import get_original_cwd, to_absolute_path, instantiate
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
 
 import warnings
 warnings.filterwarnings("ignore")
 
+@hydra.main(config_path="./configs", config_name="train", version_base="1.1")
+def main(cfg:DictConfig):
+    print(cfg)
+    # TODO CANVIAR TOT AIXÔ PER UTILITZAR EL HYDRA
+    name_file_loaded = cfg.data.utils.name
+    path_data = cfg.data.utils.path
 
-def main(input_file: Path, model_config: dict, checkpoint_dir: Optional[Path] = None, export_dir: Optional[Path] = None,
-         use_aggregation_of_kfolds: bool = False, write_compare: bool = False):
-
-    # Read CSV file into a pandas DataFrame
     print("Loading data...")
-    df = pd.read_csv(input_file)
+    df = instantiate(cfg.data.load, filepath_or_buffer=os.path.join(path_data , name_file_loaded))
+    del df["ALTITUD"]
     print("Done!")
 
     # Create an instance of YourModelClass
+    params = cfg.models.model
+    export_dir = os.path.join(cfg.outputs.exports.path,cfg.outputs.exports.which)  ## which mean kfold or static cross val (random_split)
+    
     print("Loading model...")
-    model = XGboost(model_config, export_dir)
+    model = XGboost(params, export_dir)
     print("Done!")
 
     # TRAIN BLOCK
@@ -33,20 +43,22 @@ def main(input_file: Path, model_config: dict, checkpoint_dir: Optional[Path] = 
     
     n_splits = len(df_train["CAMPAÑA"].unique())
     
-    folds = None  # model.custom_kfold_partition(df_train, target_cols="CAMPAÑA", n_splits=n_splits, random_state=1)
+    folds = None #model.custom_kfold_partition(df_train, target_cols="CAMPAÑA", n_splits=n_splits, random_state=1)
 
     x_train = df_train.loc[:, df_train.columns != "PRODUCCION"]
     y_train = df_train.loc[:, "PRODUCCION"]
     print("Done!")
 
     print("Staring training...")
-    model.train(x=x_train, y=y_train, kfold_indexes=folds, write_compare=write_compare, model_config=model_config)
+    model.train(x=x_train, y=y_train, kfold_indexes=folds, write_compare=cfg.setup.val_compare_file)
     print("Done!")
 
-    if checkpoint_dir:
+    checkpoint_dir = cfg.outputs.checkpoints.path
+    if checkpoint_dir is not None:
         print("Saving checkpoint...")
-        checkpoint_dir.mkdir(exist_ok=True)
-        model_name = checkpoint_dir / "latest.pkl"
+        if not os.path.exists(checkpoint_dir):
+            os.mkdirs(checkpoint_dir)
+        model_name = os.path.join(checkpoint_dir, cfg.outputs.checkpoints.name_file)
         save_pickle(model, model_name)
         print("Done!")
     print("*** END TRAIN BLOCK ***")
@@ -55,7 +67,7 @@ def main(input_file: Path, model_config: dict, checkpoint_dir: Optional[Path] = 
     print("*** TEST BLOCK ***")
     x_test = df_test.loc[:, df_test.columns != "PRODUCCION"]
     
-    if use_aggregation_of_kfolds:
+    if cfg.setup.kfold_agg:
         print("Using aggregation of kfolds...")
         to_agg = np.zeros(x_test.shape[0])
         for dicts, _ in model._dict_results: 
@@ -74,48 +86,23 @@ def main(input_file: Path, model_config: dict, checkpoint_dir: Optional[Path] = 
         print("Done!")
 
     print("Writing response...")
-    name_file_response = export_dir / "UH2023_Universitat Autònoma de Barcelona (UAB)_AskGPC_1.csv"
+    export_name = cfg.outputs.exports.name_file
+    name_file_response = export_dir + "/UH2023_Universitat Autònoma de Barcelona (UAB)_AskGPC_1.csv"
     write_response_file(x_test, test_predictions, name_file_response)
     print("Done!")
 
 
 if __name__ == "__main__":
+    main()
+    
+    # TODO CANVIAR TOT AIXÔ PER UTILITZAR EL HYDRA
+    exit()
     """
     Original train set: UH_2023_TRAIN.txt
     New processed train set: 
         - DATA_TRAIN_JOINED_DAYS.csv, aggregated by days
         - DATA_TRAIN_JOINED_MONTHS.csv, aggregated by months
     """
-
-    # Constants
-    ROOT = Path(os.getcwd()).absolute()
-    ROOT_DATA = ROOT.parent / "data"
-    ROOT_OUTPUTS = ROOT.parent / "outputs"
-    ROOT_OUTPUTS.mkdir(exist_ok=True)
-
-    # Inputs
-    input_file = ROOT_DATA / "DATA_TRAIN_JOINED_DAYS_NO_ALT.csv"
-
-    # Outputs
-    checkpoint_dir = ROOT_OUTPUTS / "checkpoints"
-    export_dir = ROOT_OUTPUTS / "export"
-    checkpoint_dir.mkdir(exist_ok=True)
-    export_dir.mkdir(exist_ok=True)
-
-    # Model configuration
-    model_config = {
-        "n_estimators": 2000,
-        "n_jobs": -1,
-        "max_depth": 7,
-        "eta": 0.1,
-        "subsample": 0.7,
-        "colsample_bytree": 0.8,
-        'objective': 'reg:squarederror',
-        'tree_method': 'gpu_hist',
-    }
-
-    use_aggregation_of_kfolds = True
-    write_compare = True
 
     main(input_file=input_file, model_config=model_config, checkpoint_dir=checkpoint_dir, export_dir=export_dir,
          use_aggregation_of_kfolds=use_aggregation_of_kfolds, write_compare=write_compare)

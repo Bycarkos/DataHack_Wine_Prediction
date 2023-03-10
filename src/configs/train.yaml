@@ -1,0 +1,10 @@
+hydra:  
+  run:
+    dir: runs/${models.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+defaults:
+  - _self_
+  - data: default
+  - setup: default
+  - models: Xgboost
+  - outputs: default

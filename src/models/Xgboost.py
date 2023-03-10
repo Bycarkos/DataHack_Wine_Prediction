@@ -2,12 +2,13 @@ from pathlib import Path
 
 import pandas as pd
 from overrides import overrides
+import os
 
 from .BaseModel import *
 import xgboost as xgb
 from typing import *
 
-from src.utils import write_compare_file
+from utils import write_compare_file
 
 
 class XGboost(BaseModel):
@@ -37,7 +38,7 @@ class XGboost(BaseModel):
         return xgb.DMatrix(x, label=y)
 
     @overrides(check_signature=False)
-    def trainer(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray, model_config: dict):
+    def trainer(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
         """
         Entrena un modelo de regresión XGBoost y devuelve el modelo entrenado, RMSE, número de muestras y número de características.
 
@@ -53,7 +54,7 @@ class XGboost(BaseModel):
         #dtrain = xgb.DMatrix(X_train, label=y_train)
         num_samples, num_features = x_train.shape
 
-        model = xgb.XGBRegressor(**model_config)
+        model = xgb.XGBRegressor(**self.cfg)
         model.fit(x_train, y_train, eval_set=[(x_train, y_train), (x_val, y_val)], early_stopping_rounds=10)  # Evaluation on train set, validation done apart
 
         y_pred = model.predict(x_train)
@@ -97,8 +98,7 @@ class XGboost(BaseModel):
 
         return result, y_pred
 
-    def train(self, x: Union[np.ndarray, pd.DataFrame], y: Union[np.ndarray, pd.DataFrame], model_config: dict,
-              write_compare: bool = False, kfold_indexes: Optional[list] = None):
+    def train(self, x: Union[np.ndarray, pd.DataFrame], y: Union[np.ndarray, pd.DataFrame],write_compare: bool = False, kfold_indexes: Optional[list] = None):
         """
         Entrena un modelo de regresión XGBoost y devuelve tres listas con la prediccion según la métrica RMSE.
 
@@ -122,7 +122,7 @@ class XGboost(BaseModel):
             x_train, y_train, x_val, y_val, x_test, y_test = self.train_val_test_split(x, y, random_state=1)
 
             print("--> Training")
-            result, y_pred, model = self.trainer(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val, model_config=model_config)
+            result, y_pred, model = self.trainer(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val)
             train_r2 = self._r2(prediction=y_pred, target=y_train)
             train_metrics.append((result, train_r2))
 
@@ -135,6 +135,23 @@ class XGboost(BaseModel):
             resultat_test, y_pred = self.validator(model=model, x_val=x_test, y_val=y_test)
             test_r2 = self._r2(prediction=y_pred, target=y_test)
             test_metrics.append((resultat_test, test_r2))
+            
+            if write_compare:
+                write_compare_fold_dir = self.export_dir
+                if not os.path.exists(write_compare_fold_dir):
+                    os.mkdirs(write_compare_fold_dir)    
+                                
+                print("WRITE THE COMPARATION IN THE VALIDATION FOR RMSE")
+                write_compare_name_val = str(write_compare_fold_dir+ "validate.csv")
+                write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name_val)
+                print("---------------------------------------------------------")
+                print("WRITE THE COMPARATION IN THE TEST FOR RMSE")
+                write_compare_name_test = str(write_compare_fold_dir+ "validate.csv")
+                write_compare_file(x_test, y_pred, y_test, name_file=write_compare_name_test)
+                print("---------------------------------------------------------")
+                
+                
+            
                             
         else:
             print("Kfold indexes, iterating over splits...")
@@ -150,7 +167,7 @@ class XGboost(BaseModel):
                 y_val = y.iloc[test_idx]
 
                 print("--> Training")
-                result, y_pred, model = self.trainer(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val, model_config=model_config)
+                result, y_pred, model = self.trainer(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val)
                 result["pred"] = y_pred
                 result["gt"] = y_train
                 result["fold_indexes"] = train_idx
@@ -162,12 +179,18 @@ class XGboost(BaseModel):
                 resultat_val["fold_indexes"] = test_idx
                 val_r2 = self._r2(prediction=y_pred, target=y_val)
                 val_metrics.append((resultat_val, val_r2))
-                
+                print(f"In the Validation r2={val_r2}")
+
                 if write_compare:
-                    write_compare_fold_dir = self.export_dir / "kfold"
-                    write_compare_fold_dir.mkdir(exist_ok=True)
-                    write_compare_name = str(write_compare_fold_dir / f"{fold_id}.csv")
-                    write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name, fold=str(fold_id))
+                    write_compare_fold_dir = self.export_dir
+                    if not os.path.exists(write_compare_fold_dir):
+                        os.mkdirs(write_compare_fold_dir)
+                    
+                    #write_compare_fold_dir.mkdir(exist_ok=True)
+                    write_compare_name = str(write_compare_fold_dir + f"_{fold_id}.csv")
+                    
+                    print(F"WRITE THE COMPARATION: FOLD-{fold_id}")
+                    write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name)
                 
         self._dict_results = train_metrics
         self._validations_results = val_metrics

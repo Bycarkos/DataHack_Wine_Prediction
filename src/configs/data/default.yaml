@@ -1,0 +1,9 @@
+utils:
+  path: ${hydra:runtime.cwd}/data/
+  name: DATA_TRAIN_JOINED_DAYS.csv
+
+load:
+  _target_ : pandas.read_csv
+  filepath_or_buffer: ??
+  sep: ","
+

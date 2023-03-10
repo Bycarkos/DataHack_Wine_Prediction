@@ -1,0 +1,11 @@
+model:
+  num_layers: 3
+  input_features: ???
+  hidden_features_reduction: 0.5
+  output_features: 1
+
+  activation_layer:
+    _target_: torch.nn.ReLU
+
+  layer_norm:
+    _target_: torch.nn.LayerNorm
