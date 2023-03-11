@@ -1,6 +1,7 @@
 epochs: 100
 val_compare_file: True
-kfold_agg: True
+use_kfold: False
+kfold_agg: False
 
 optimizer:
   _target_: torch.optim.Adam

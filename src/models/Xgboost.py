@@ -131,6 +131,15 @@ class XGboost(BaseModel):
             val_r2 = self._r2(prediction=y_pred, target=y_val)
             val_metrics.append((resultat_val, val_r2))
 
+            if write_compare:
+                write_compare_fold_dir = self.export_dir
+                if not os.path.exists(write_compare_fold_dir):
+                    os.mkdir(write_compare_fold_dir)
+
+                print("Write the comparison for RSME...")
+                write_compare_name_val = str(write_compare_fold_dir / "validate.csv")
+                write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name_val)
+
             print("--> Test")
             resultat_test, y_pred = self.validator(model=model, x_val=x_test, y_val=y_test)
             test_r2 = self._r2(prediction=y_pred, target=y_test)
@@ -139,20 +148,12 @@ class XGboost(BaseModel):
             if write_compare:
                 write_compare_fold_dir = self.export_dir
                 if not os.path.exists(write_compare_fold_dir):
-                    os.mkdirs(write_compare_fold_dir)    
-                                
-                print("WRITE THE COMPARATION IN THE VALIDATION FOR RMSE")
-                write_compare_name_val = str(write_compare_fold_dir+ "validate.csv")
-                write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name_val)
-                print("---------------------------------------------------------")
-                print("WRITE THE COMPARATION IN THE TEST FOR RMSE")
-                write_compare_name_test = str(write_compare_fold_dir+ "validate.csv")
+                    os.mkdir(write_compare_fold_dir)
+
+                print("Write the comparison for RSME...")
+                write_compare_name_test = str(write_compare_fold_dir / "validate.csv")
                 write_compare_file(x_test, y_pred, y_test, name_file=write_compare_name_test)
-                print("---------------------------------------------------------")
-                
-                
-            
-                            
+
         else:
             print("Kfold indexes, iterating over splits...")
             for fold_id, (train_idx, test_idx) in enumerate(kfold_indexes):
@@ -184,12 +185,11 @@ class XGboost(BaseModel):
                 if write_compare:
                     write_compare_fold_dir = self.export_dir
                     if not os.path.exists(write_compare_fold_dir):
-                        os.mkdirs(write_compare_fold_dir)
+                        os.mkdir(write_compare_fold_dir)
+
+                    write_compare_name = str(write_compare_fold_dir / f"_{fold_id}.csv")
                     
-                    #write_compare_fold_dir.mkdir(exist_ok=True)
-                    write_compare_name = str(write_compare_fold_dir + f"_{fold_id}.csv")
-                    
-                    print(F"WRITE THE COMPARATION: FOLD-{fold_id}")
+                    print(f"FOLD_{fold_id}: Write the comparison for RSME...")
                     write_compare_file(x_val, y_pred, y_val, name_file=write_compare_name)
                 
         self._dict_results = train_metrics

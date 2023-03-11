@@ -1,7 +1,7 @@
 exports:
   path: ${hydra:runtime.cwd}/outputs/export
   which: kfold 
-  name_file: UH2023_Universitat Autònoma de Barcelona (UAB)_AskGPC_1.csv
+  name_file: response.csv
 
 checkpoints:
   path: ${hydra:runtime.cwd}/outputs/checkpoints

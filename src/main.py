@@ -1,35 +1,33 @@
 import os
 from pathlib import Path
-from typing import Optional
 
-import pandas as pd
-from models.Xgboost import XGboost
 import numpy as np
 
-from utils import save_pickle, get_best_model, write_response_file
-from hydra.utils import get_original_cwd, to_absolute_path, instantiate
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from hydra.utils import instantiate
+from omegaconf import DictConfig
 
+from models.Xgboost import XGboost
+
+from utils import save_pickle, get_best_model, write_response_file
 
 import warnings
 warnings.filterwarnings("ignore")
 
+
 @hydra.main(config_path="./configs", config_name="train", version_base="1.1")
-def main(cfg:DictConfig):
+def main(cfg: DictConfig):
     print(cfg)
-    # TODO CANVIAR TOT AIXÔ PER UTILITZAR EL HYDRA
     name_file_loaded = cfg.data.utils.name
     path_data = cfg.data.utils.path
 
     print("Loading data...")
-    df = instantiate(cfg.data.load, filepath_or_buffer=os.path.join(path_data , name_file_loaded))
-    del df["ALTITUD"]
+    df = instantiate(cfg.data.load, filepath_or_buffer=os.path.join(path_data, name_file_loaded))
     print("Done!")
 
     # Create an instance of YourModelClass
     params = cfg.models.model
-    export_dir = os.path.join(cfg.outputs.exports.path,cfg.outputs.exports.which)  ## which mean kfold or static cross val (random_split)
+    export_dir = Path(os.path.join(cfg.outputs.exports.path, cfg.outputs.exports.which))  ## which mean kfold or static cross val (random_split)
     
     print("Loading model...")
     model = XGboost(params, export_dir)
@@ -43,7 +41,7 @@ def main(cfg:DictConfig):
     
     n_splits = len(df_train["CAMPAÑA"].unique())
     
-    folds = None #model.custom_kfold_partition(df_train, target_cols="CAMPAÑA", n_splits=n_splits, random_state=1)
+    folds = model.custom_kfold_partition(df_train, target_cols="CAMPAÑA", n_splits=n_splits, random_state=1) if cfg.setup.use_kfold else None
 
     x_train = df_train.loc[:, df_train.columns != "PRODUCCION"]
     y_train = df_train.loc[:, "PRODUCCION"]
@@ -57,8 +55,8 @@ def main(cfg:DictConfig):
     if checkpoint_dir is not None:
         print("Saving checkpoint...")
         if not os.path.exists(checkpoint_dir):
-            os.mkdirs(checkpoint_dir)
-        model_name = os.path.join(checkpoint_dir, cfg.outputs.checkpoints.name_file)
+            os.mkdir(checkpoint_dir)
+        model_name = Path(os.path.join(checkpoint_dir, cfg.outputs.checkpoints.name_file))
         save_pickle(model, model_name)
         print("Done!")
     print("*** END TRAIN BLOCK ***")
@@ -86,17 +84,12 @@ def main(cfg:DictConfig):
         print("Done!")
 
     print("Writing response...")
-    export_name = cfg.outputs.exports.name_file
-    name_file_response = export_dir + "/UH2023_Universitat Autònoma de Barcelona (UAB)_AskGPC_1.csv"
-    write_response_file(x_test, test_predictions, name_file_response)
+    export_name = export_dir / cfg.outputs.exports.name_file
+    write_response_file(x_test, test_predictions, export_name)
     print("Done!")
 
 
 if __name__ == "__main__":
-    main()
-    
-    # TODO CANVIAR TOT AIXÔ PER UTILITZAR EL HYDRA
-    exit()
     """
     Original train set: UH_2023_TRAIN.txt
     New processed train set: 
@@ -104,7 +97,4 @@ if __name__ == "__main__":
         - DATA_TRAIN_JOINED_MONTHS.csv, aggregated by months
     """
 
-    main(input_file=input_file, model_config=model_config, checkpoint_dir=checkpoint_dir, export_dir=export_dir,
-         use_aggregation_of_kfolds=use_aggregation_of_kfolds, write_compare=write_compare)
-    
-   
+    main()
