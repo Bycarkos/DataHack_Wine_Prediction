@@ -1,9 +1,18 @@
-utils:
-  path: ${hydra:runtime.cwd}/data/
-  name: DATA_TRAIN_JOINED_DAYS.csv
+DataLoader:
 
-load:
-  _target_ : pandas.read_csv
-  filepath_or_buffer: ??
-  sep: ","
+  load:
+    _target_ : pandas.read_csv
+    filepath_or_buffer: ??
+    sep: ","
+
+  collector:
+    _target_: main.Collector
+    batch_size: 64
+    shuffle: True
+    random_state: 1
+
+  utils:
+    path: ${hydra:runtime.cwd}/data/
+    name: DATA_TRAIN_JOINED_DAYS.csv
+
 

@@ -8,6 +8,8 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 from models.Xgboost import XGboost
+from data.Collector import Collector
+from data.DataLoader import DataLoader
 
 from utils import save_pickle, get_best_model, write_response_file
 
@@ -18,37 +20,42 @@ warnings.filterwarnings("ignore")
 @hydra.main(config_path="./configs", config_name="train", version_base="1.1")
 def main(cfg: DictConfig):
     print(cfg)
-    name_file_loaded = cfg.data.utils.name
-    path_data = cfg.data.utils.path
-
-    print("Loading data...")
-    df = instantiate(cfg.data.load, filepath_or_buffer=os.path.join(path_data, name_file_loaded))
+    print("Loading DataLoader...")
+    dl = DataLoader(cfg.data.DataLoader)    
+    df = dl._data
+    del df["ALTITUD"]
     print("Done!")
-
+    
     # Create an instance of YourModelClass
     params = cfg.models.model
     export_dir = Path(os.path.join(cfg.outputs.exports.path, cfg.outputs.exports.which))  ## which mean kfold or static cross val (random_split)
     
+    
+    # CANVIAR AIXÔ PER A QUE SIGUI un INSTANTIATE
     print("Loading model...")
     model = XGboost(params, export_dir)
     print("Done!")
 
     # TRAIN BLOCK
     print("*** TRAIN BLOCK ***")
-    print("Preparing splits...")
     df_train = df.loc[df["CAMPAÑA"] != 22]
     df_test = df.loc[df["CAMPAÑA"] == 22]
     
-    n_splits = len(df_train["CAMPAÑA"].unique())
+    if cfg.setup.mode == "kfold":
+        n_splits = len(df_train["CAMPAÑA"].unique())
     
-    folds = model.custom_kfold_partition(df_train, target_cols="CAMPAÑA", n_splits=n_splits, random_state=1) if cfg.setup.use_kfold else None
-
-    x_train = df_train.loc[:, df_train.columns != "PRODUCCION"]
-    y_train = df_train.loc[:, "PRODUCCION"]
+        x_train = df_train.loc[:, df_train.columns != "PRODUCCION"]
+        y_train = df_train.loc[:, "PRODUCCION"]
+        
+        train_folds_idx, batches_train, test_folds_idx, batches_test =  dl.kfold_collector(x_train,n_splits=n_splits, columns="CAMPAÑA")
+          
+    else:
+        train_pack, val_pack, test_pack = dl.train_val_test_split_collector(x_train, y_train, metaclasses=["CAMPAÑA"])
     print("Done!")
 
+    # TODO TOMORROW
     print("Staring training...")
-    model.train(x=x_train, y=y_train, kfold_indexes=folds, write_compare=cfg.setup.val_compare_file)
+    model.train(x=x_train, y=y_train, write_compare=cfg.setup.val_compare_file)
     print("Done!")
 
     checkpoint_dir = cfg.outputs.checkpoints.path
