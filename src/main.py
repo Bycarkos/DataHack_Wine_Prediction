@@ -11,7 +11,7 @@ from models.Xgboost import XGboost
 from data.Collector import Collector
 from data.DataLoader import DataLoader
 
-from utils import save_pickle, get_best_model, write_response_file
+from utils import *
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -33,29 +33,34 @@ def main(cfg: DictConfig):
     
     # CANVIAR AIXÔ PER A QUE SIGUI un INSTANTIATE
     print("Loading model...")
-    model = XGboost(params, export_dir)
+    model = instantiate(cfg.models.model, export_dir=export_dir)
     print("Done!")
-
     # TRAIN BLOCK
     print("*** TRAIN BLOCK ***")
     df_train = df.loc[df["CAMPAÑA"] != 22]
     df_test = df.loc[df["CAMPAÑA"] == 22]
     
+    x_train = df_train.loc[:, df_train.columns != "PRODUCCION"]
+    y_train = df_train.loc[:, "PRODUCCION"]
+    
+    print("PREPARING PARTITIONS AND TRAINING THE MODELS")
+    
     if cfg.setup.mode == "kfold":
         n_splits = len(df_train["CAMPAÑA"].unique())
-    
-        x_train = df_train.loc[:, df_train.columns != "PRODUCCION"]
-        y_train = df_train.loc[:, "PRODUCCION"]
-        
-        train_folds_idx, batches_train, test_folds_idx, batches_test =  dl.kfold_collector(x_train,n_splits=n_splits, columns="CAMPAÑA")
-          
-    else:
-        train_pack, val_pack, test_pack = dl.train_val_test_split_collector(x_train, y_train, metaclasses=["CAMPAÑA"])
-    print("Done!")
 
-    # TODO TOMORROW
-    print("Staring training...")
-    model.train(x=x_train, y=y_train, write_compare=cfg.setup.val_compare_file)
+        train_folds_idx, batches_train, test_folds_idx, batches_test =  dl.kfold_collector(x_train,n_splits=n_splits, columns="CAMPAÑA")
+        
+        best_model = model.train(x_train=x_train, y_train=y_train, kfold_indexes=[train_folds_idx, test_folds_idx] ,write_compare=cfg.setup.val_compare_file)
+
+    else:
+        train_pack, val_pack, test_pack = dl.train_val_test_split_collector(x_train, y_train, metaclasses=["CAMPAÑA"], ret="dataframe")
+        x_train, y_train, train_batches = train_pack
+        x_val, y_val, val_batches = val_pack
+        x_test, y_test, test_batches = test_pack    
+        best_model = model.train(x_train = x_train, y_train = y_train, x_val=x_val, y_val=y_val ,write_compare=cfg.setup.val_compare_file)
+        print("*** TEST BLOCK ***")
+        model.validator(model=best_model, x_test=x_test, y_test=y_test) # Es pot afegir write compare
+
     print("Done!")
 
     checkpoint_dir = cfg.outputs.checkpoints.path
@@ -71,24 +76,9 @@ def main(cfg: DictConfig):
     # TEST BLOCK
     print("*** TEST BLOCK ***")
     x_test = df_test.loc[:, df_test.columns != "PRODUCCION"]
-    
-    if cfg.setup.kfold_agg:
-        print("Using aggregation of kfolds...")
-        to_agg = np.zeros(x_test.shape[0])
-        for dicts, _ in model._dict_results: 
-            model_to_test = dicts["model"]
-            _, test_predictions = model.validator(model=model_to_test, x_val=x_test)
-            to_agg = np.add(to_agg, np.array(test_predictions))
-        
-        test_predictions = np.divide(to_agg, n_splits)
-        print("Done!")
-
-    else:
-        print("Using best model...")
-        best_model_idx = get_best_model(model._validations_results)
-        model_to_test = model._dict_results[best_model_idx][0]["model"]    
-        _, test_predictions = model.validator(model=model_to_test, x_val=x_test)
-        print("Done!")
+    print("Using best model...")  
+    _, test_predictions = model.validator(model=best_model, x_test=x_test)
+    print("Done!")
 
     print("Writing response...")
     export_name = export_dir / cfg.outputs.exports.name_file

@@ -42,7 +42,7 @@ class Collector():
             
         return np.array(train_folds), np.array(test_folds)
     
-    def get_train_val_test_split(self, X,y, sizes:Tuple[float, float, float]= [0.8,0.1,0.1], metaclasses: Optional[Tuple[str, str]]=None) -> Tuple[torch.Tensor, ...]:
+    def get_train_val_test_split(self, X,y, sizes:Tuple[float, float, float]= [0.8,0.1,0.1], metaclasses: Optional[Tuple[str, str]]=None, ret="dataframe") -> Tuple[torch.Tensor, ...]:
         
         assert sum(sizes) == 1., "Error with the proportions"
         if metaclasses is not None:
@@ -74,34 +74,39 @@ class Collector():
                 
                 elif bool(set([name])&set(test_groups)) == True:
                     test = pd.concat([test,group])
+            
                     
             df_train = train.reset_index().drop("index", axis=1)
             df_validation = validation.reset_index().drop("index", axis=1)
             df_test = test.reset_index().drop("index", axis=1)
+
             ### Train
-            y_train = torch.tensor(df_train["target"].values)
-            X_train = torch.tensor(df_train.drop("target", axis=1).values)
+            y_train = (df_train["target"])
+            X_train = (df_train.drop("target", axis=1))
             
             ## validation
-            y_val = torch.tensor(df_validation["target"].values)
-            X_val = torch.tensor(df_validation.drop("target", axis=1).values)          
+            y_val = (df_validation["target"].values)
+            X_val = (df_validation.drop("target", axis=1))          
             
             ##test
-            y_test = torch.tensor(df_test["target"].values)
-            X_test = torch.tensor(df_test.drop("target", axis=1).values)
-            
-            
-            return X_train , y_train, X_val, y_val, X_test, y_test
+            y_test = (df_test["target"])
+            X_test = (df_test.drop("target", axis=1))
+
         
         else:
             train_size, val_size = sizes[0], sizes[1]
             test_size = 1 - train_size - val_size
 
-            x_train_val, x_test, y_train_val, y_test = train_test_split(X, y, test_size=test_size, random_state=self._random_state)
-            x_train, x_val, y_train, y_val = train_test_split(x_train_val, y_train_val, test_size=val_size/(train_size+val_size), random_state=self._random_state)
-            
-            return torch.tensor(x_train), torch.tensor(y_train), torch.tensor(x_val), torch.tensor(y_val), torch.tensor(x_test), torch.tensor(y_test)
-               
+            x_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=test_size, random_state=self._random_state)
+            X_train, X_val, y_train, y_val = train_test_split(x_train_val, y_train_val, test_size=val_size/(train_size+val_size), random_state=self._random_state)
+                    
+        if ret != "dataframe":
+            print("HOLA HOLA")
+            return torch.tensor(X_train.values) , torch.tensor(y_train.values), torch.tensor(X_val.values), torch.tensor(y_val.values), torch.tensor(X_test.values), torch.tensor(y_test.values)
+        else:
+    
+            return X_train , y_train, X_val, y_val, X_test, y_test
+        
     @staticmethod
     def get_batch_idx(size, batch_size):    
         nb_batch = int(np.ceil(size / float(batch_size)))

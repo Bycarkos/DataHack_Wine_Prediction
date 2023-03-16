@@ -38,8 +38,8 @@ class DataLoader():
         
         return train_folds, np.array(batches_train_fold), test_folds, np.array(batches_test_fold)
         
-    def train_val_test_split_collector(self, X:pd.DataFrame, y:pd.DataFrame, sizes: Optional[Tuple[float, float, float]] = [0.8,0.1,0.1],metaclasses: Optional[Tuple[str, str]]=None):
-        x_train, y_train, x_val, y_val, x_test, y_test = self._collector.get_train_val_test_split(X=X, y=y,sizes=sizes, metaclasses=metaclasses )
+    def train_val_test_split_collector(self, X:pd.DataFrame, y:pd.DataFrame, sizes: Optional[Tuple[float, float, float]] = [0.8,0.1,0.1],metaclasses: Optional[Tuple[str, str]]=None, ret="dataframe"):
+        x_train, y_train, x_val, y_val, x_test, y_test = self._collector.get_train_val_test_split(X=X, y=y,sizes=sizes, metaclasses=metaclasses, ret=ret )
 
         batches_train = self._collector.get_batch_idx(x_train.shape[0], self._collector._batch_size)
         batches_val = self._collector.get_batch_idx(x_val.shape[0], self._collector._batch_size)

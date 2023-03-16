@@ -92,6 +92,43 @@ class Stats():
                 print("El RMSE del nuevo modelo no supera al de referencia")
    
     
+    
+    def write_response_file(self,x:pd.DataFrame, predictions:np.ndarray, name_file:Optional[Path]):
+        # Agregar la columna "RESPONSE" al dataframe x
+        print(x)
+        print(predictions)
+        x["RESPONSE"] = np.array(predictions)
+        
+        # Agrupar por las columnas especificadas y sumar las columnas "PRODUCCION" y "RESPONSE"
+        group_cols = ["ID_FINCA", "VARIEDAD", "MODO", "TIPO", "COLOR", "SUPERFICIE"]
+        sum_cols = ["PRODUCCION", "RESPONSE"]  if "PRODUCCION" in x.columns else ["RESPONSE"]
+        grouped = x.groupby(group_cols, as_index=False)[sum_cols].sum()
+        
+        # Seleccionar las columnas específicas
+        cols_to_keep = group_cols + sum_cols
+        grouped = grouped[cols_to_keep]
+        
+        # Escribir el resultado en un archivo csv
+        if name_file is None:
+            name_file ="standard_validation_output.csv" 
+        grouped.to_csv(name_file, index=False)
+        
+        # Calcular las métricas solicitadas
+        resp_total = x["RESPONSE"].sum()
+        if "PRODUCCION" in x.columns:
+            prod_total = x["PRODUCCION"].sum()
+            rmse = np.sqrt(mean_squared_error(x["PRODUCCION"], x["RESPONSE"]))
+            r2 = r2_score(x["PRODUCCION"], x["RESPONSE"])
+            perc_error = abs(prod_total - resp_total) / prod_total * 100
+            
+            # Escribir el mensaje verbose
+            print(f"La suma de PRODUCCION es {prod_total} y la suma de RESPONSE es {resp_total}.")
+            print(f"El RMSE es {rmse}, el R2 es {r2}, y el porcentaje de error de la diferencia de la suma de la producción total y la RESPONSE es {perc_error}%.")
+        
+        print(f"La suma de RESPONSE es {resp_total}.")
+
+
+
     def write_interval_confidence(self, df_response, metaclass):
         pass
     

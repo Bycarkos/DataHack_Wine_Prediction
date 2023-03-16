@@ -3,7 +3,7 @@ DataLoader:
   load:
     _target_ : pandas.read_csv
     filepath_or_buffer: ??
-    sep: ","
+    sep: "|"
 
   collector:
     _target_: main.Collector
@@ -13,6 +13,6 @@ DataLoader:
 
   utils:
     path: ${hydra:runtime.cwd}/data/
-    name: DATA_TRAIN_JOINED_DAYS.csv
+    name: UH_2023_TRAIN.txt
 
 

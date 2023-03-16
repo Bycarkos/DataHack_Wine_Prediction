@@ -1,6 +1,6 @@
 exports:
   path: ${hydra:runtime.cwd}/outputs/export
-  which: kfold 
+  which: random_split
   name_file: response.csv
 
 checkpoints:
